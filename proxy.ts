@@ -2351,6 +2351,11 @@ function writeSSEStream(
       sendDone();
       closeResponse();
       activeBridges.delete(bridgeKey);
+    } else {
+      // Bridge closed cleanly after a tool call pause. The HTTP response was
+      // already ended by the MCP exec handler; just ensure cleanup.
+      activeBridges.delete(bridgeKey);
+      closeResponse();
     }
   });
 }
