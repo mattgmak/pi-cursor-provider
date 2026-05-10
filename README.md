@@ -1,8 +1,22 @@
-# pi-cursor-provider
+# pi-cursor-provider (vkrest fork)
+
+> **This fork adds image support.** You can send images alongside text in chat completions. The upstream repo does not support this — it only handles plain text messages. See [Image Support](#image-support) below.
 
 [![npm version](https://img.shields.io/npm/v/pi-cursor-provider.svg)](https://www.npmjs.com/package/pi-cursor-provider)
 
 [Pi](https://github.com/badlogic/pi-mono) extension that provides access to [Cursor](https://cursor.com) models via OAuth authentication and a local OpenAI-compatible proxy.
+
+Forked from [ndraiman/pi-cursor-provider](https://github.com/ndraiman/pi-cursor-provider).
+
+## Image Support
+
+This fork extends the proxy to handle images in OpenAI-style `image_url` content parts:
+
+- **Base64 images** — `data:image/png;base64,...` payloads are extracted from the request, stored as blobs in Cursor's protobuf format, and forwarded to the upstream API.
+- **Multi-turn state** — images are tracked per conversation turn and threaded correctly through session checkpoints, forks, and resumes.
+- **Transparent to callers** — no API changes; just include standard `image_url` content parts in your messages as you would with any OpenAI-compatible client.
+
+The upstream repo does not support images at all — they are silently ignored or cause request failures. This fork handles them properly end-to-end.
 
 ## How it works
 
