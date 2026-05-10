@@ -1,4 +1,4 @@
-# pi-cursor-provider (vkrest fork)
+# pi-cursor-provider
 
 > **This fork adds image support.** You can send images alongside text in chat completions. The upstream repo does not support this — it only handles plain text messages. See [Image Support](#image-support) below.
 
@@ -68,23 +68,23 @@ Each raw Cursor model ID is parsed into components:
 
 Examples:
 
-| Raw Cursor ID | Base | Effort | Variant |
-|---|---|---|---|
-| `gpt-5.4-medium` | `gpt-5.4` | `medium` | — |
-| `gpt-5.4-high-fast` | `gpt-5.4` | `high` | `-fast` |
-| `claude-4.6-opus-max-thinking` | `claude-4.6-opus` | `max` | `-thinking` |
-| `gpt-5.1-codex-max-high` | `gpt-5.1-codex-max` | `high` | — |
-| `composer-2` | `composer-2` | — | — |
+| Raw Cursor ID                  | Base                | Effort   | Variant     |
+| ------------------------------ | ------------------- | -------- | ----------- |
+| `gpt-5.4-medium`               | `gpt-5.4`           | `medium` | —           |
+| `gpt-5.4-high-fast`            | `gpt-5.4`           | `high`   | `-fast`     |
+| `claude-4.6-opus-max-thinking` | `claude-4.6-opus`   | `max`    | `-thinking` |
+| `gpt-5.1-codex-max-high`       | `gpt-5.1-codex-max` | `high`   | —           |
+| `composer-2`                   | `composer-2`        | —        | —           |
 
 Models sharing the same `(base, variant)` with **≥2 effort levels** and a sensible default (`medium` or no-suffix) are collapsed into a single entry with `supportsReasoningEffort: true`. Pi's thinking level maps to the effort suffix:
 
-| Pi Level | Cursor Suffix |
-|---|---|
-| `minimal` | `none` (if available) or `low` |
-| `low` | `low` |
-| `medium` | `medium` or no suffix (default) |
-| `high` | `high` |
-| `xhigh` | `max` (Claude) or `xhigh` (GPT) |
+| Pi Level  | Cursor Suffix                   |
+| --------- | ------------------------------- |
+| `minimal` | `none` (if available) or `low`  |
+| `low`     | `low`                           |
+| `medium`  | `medium` or no suffix (default) |
+| `high`    | `high`                          |
+| `xhigh`   | `max` (Claude) or `xhigh` (GPT) |
 
 The proxy inserts the effort before `-fast`/`-thinking`:
 
