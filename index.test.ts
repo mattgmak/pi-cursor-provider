@@ -2287,3 +2287,70 @@ describe("proxy integration — session handling", () => {
     ).toEqual(storedCheckpoint);
   });
 });
+
+describe("proxy hang fixes", () => {
+  test("non-streaming: exec requests are rejected immediately so the bridge closes and the response resolves", async () => {
+    const execClientMessages: any[] = [];
+
+    setBridgeFactoryForTests(
+      (options) =>
+        new FakeBridge(options, (clientMessage, fake) => {
+          if (clientMessage.message.case === "runRequest") {
+            fake.emitServerMessage(
+              makeMcpExecMessage("tc1", "read", { path: "README.md" }),
+            );
+            return;
+          }
+          if (clientMessage.message.case === "execClientMessage") {
+            execClientMessages.push(clientMessage.message.value);
+            fake.emitServerMessage(makeTextDeltaMessage("done"));
+            fake.emitServerMessage(makeCheckpointMessage());
+            fake.close(0);
+          }
+        }),
+    );
+
+    const port = await startProxy(async () => "test-token");
+    const response = await postChatCompletion(port, {
+      model: "gpt-5",
+      stream: false,
+      messages: [{ role: "user", content: "hello" }],
+    });
+
+    expect(response.statusCode).toBe(200);
+    const parsed = JSON.parse(response.body);
+    expect(parsed.choices[0].message.content).toContain("done");
+
+    expect(execClientMessages).toHaveLength(1);
+    expect(execClientMessages[0].message.case).toBe("mcpResult");
+    expect(execClientMessages[0].message.value.result.case).toBe("error");
+  });
+
+  test("proxy server is unreffed so it does not prevent process exit after a response", async () => {
+    setBridgeFactoryForTests(
+      (options) =>
+        new FakeBridge(options, (clientMessage, fake) => {
+          if (clientMessage.message.case === "runRequest") {
+            fake.emitServerMessage(makeTextDeltaMessage("hi"));
+            fake.emitServerMessage(makeCheckpointMessage());
+            fake.close(0);
+          }
+        }),
+    );
+
+    const port = await startProxy(async () => "test-token");
+    const response = await postChatCompletion(port, {
+      model: "gpt-5",
+      messages: [{ role: "user", content: "hi" }],
+    });
+    expect(response.statusCode).toBe(200);
+
+    // Verify the server is still reachable (didn't crash due to unref)
+    // and a follow-up request also completes cleanly.
+    const followUp = await postChatCompletion(port, {
+      model: "gpt-5",
+      messages: [{ role: "user", content: "hi again" }],
+    });
+    expect(followUp.statusCode).toBe(200);
+  });
+});
