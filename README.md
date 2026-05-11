@@ -2,7 +2,7 @@
 
 > **This fork improves on the upstream in three areas:** image support, correct `pi -p` exit behaviour, and removal of dead eviction code. See the sections below for details.
 
-[![npm version](https://img.shields.io/npm/v/pi-cursor-provider.svg)](https://www.npmjs.com/package/pi-cursor-provider)
+[![npm version](https://img.shields.io/npm/v/@offbynan/pi-cursor-provider.svg)](https://www.npmjs.com/package/@offbynan/pi-cursor-provider)
 
 [Pi](https://github.com/badlogic/pi-mono) extension that provides access to [Cursor](https://cursor.com) models via OAuth authentication and a local OpenAI-compatible proxy.
 
@@ -54,10 +54,10 @@ pi  →  openai-completions  →  localhost:PORT/v1/chat/completions
 
 ```bash
 # Via pi install
-pi install npm:pi-cursor-provider
+pi install npm:@offbynan/pi-cursor-provider
 
 # Or manually
-git clone https://github.com/ndraiman/pi-cursor-provider ~/.pi/agent/extensions/cursor-provider
+git clone https://github.com/offbynan/pi-cursor-provider ~/.pi/agent/extensions/cursor-provider
 cd ~/.pi/agent/extensions/cursor-provider
 npm install
 ```
