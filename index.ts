@@ -12,7 +12,7 @@
  * Based on https://github.com/ephraimduncan/opencode-cursor by Ephraim Duncan.
  */
 
-import rawFallbackModels from "./cursor-models-raw.json";
+import rawFallbackModels from "./cursor-models-raw.json" with { type: "json" };
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import type {
   OAuthCredentials,
@@ -126,7 +126,7 @@ function summarizeBranchTail(
   ctx: {
     sessionManager?: {
       getBranch?: () => unknown[];
-      getLeafId?: () => string;
+      getLeafId?: () => string | null;
       getSessionId?: () => string;
     };
   },
@@ -497,11 +497,11 @@ export const FALLBACK_MODELS: CursorModel[] = (
 
 // ── Extension ──
 
-export function registerSessionLifecycleCleanup(pi: ExtensionAPI) {
+export function registerSessionLifecycleCleanup(pi: ExtensionAPI): void {
   const cleanupCurrentSession = (
     _event: unknown,
     ctx: {
-      sessionManager: { getSessionId(): string; getLeafId?: () => string };
+      sessionManager: { getSessionId(): string; getLeafId?: () => string | null };
     },
   ) => {
     debugExtensionLog("session.cleanup_hook", {
@@ -613,7 +613,7 @@ function registerExtensionDebugHooks(pi: ExtensionAPI) {
   });
 }
 
-export default async function (pi: ExtensionAPI) {
+export default async function (pi: ExtensionAPI): Promise<void> {
   // Current access token, updated by login/refresh/getApiKey
   let currentToken = "";
 

@@ -56,6 +56,8 @@ import {
   McpTextContentSchema,
   McpToolCallSchema,
   McpToolDefinitionSchema,
+  McpToolErrorSchema,
+  McpToolResultSchema,
   McpToolResultContentItemSchema,
   ModelDetailsSchema,
   ReadRejectedSchema,
@@ -265,6 +267,8 @@ function truncateDebugString(value: string, max = 4000): string {
     : value;
 }
 
+function sanitizeForDebug(value: Record<string, unknown>): Record<string, unknown>;
+function sanitizeForDebug(value: unknown): unknown;
 function sanitizeForDebug(value: unknown): unknown {
   if (value == null) return value;
   if (typeof value === "string") return truncateDebugString(value);
@@ -443,7 +447,7 @@ function spawnBridge(options: SpawnBridgeOptions): BridgeHandle {
     unref() {
       try {
         proc.unref();
-        (proc.stdout as any)?.unref?.();
+        (proc.stdout as { unref?: () => void } | null)?.unref?.();
       } catch {}
     },
     onClose(cb: (code: number) => void) {
@@ -525,7 +529,7 @@ export async function getCursorModels(apiKey: string): Promise<CursorModel[]> {
       response.exitCode === 0 &&
       response.body.length > 0
     ) {
-      let decoded: any = null;
+      let decoded: ReturnType<typeof fromBinary<typeof GetUsableModelsResponseSchema>> | null = null;
       try {
         decoded = fromBinary(GetUsableModelsResponseSchema, response.body);
       } catch {
@@ -579,14 +583,16 @@ function decodeConnectUnaryBody(payload: Uint8Array): Uint8Array | null {
 function normalizeCursorModels(models: readonly unknown[]): CursorModel[] {
   const byId = new Map<string, CursorModel>();
   for (const model of models) {
-    const m = model as any;
-    const id = m?.modelId?.trim?.();
+    if (!model || typeof model !== "object") continue;
+    const m = model as Record<string, unknown>;
+    const rawId = m["modelId"];
+    const id = typeof rawId === "string" ? rawId.trim() : "";
     if (!id) continue;
-    const name = m.displayName || m.displayNameShort || m.displayModelId || id;
+    const name = String(m["displayName"] || m["displayNameShort"] || m["displayModelId"] || id);
     byId.set(id, {
       id,
       name,
-      reasoning: Boolean(m.thinkingDetails),
+      reasoning: Boolean(m["thinkingDetails"]),
       contextWindow: 200_000,
       maxTokens: 64_000,
     });
@@ -1224,11 +1230,11 @@ function buildTurnStepBytes(step: ParsedTurnStep): Uint8Array {
       toolName,
     }),
     ...(step.result && {
-      result: create(McpResultSchema, {
+      result: create(McpToolResultSchema, {
         result: step.result.isError
           ? {
               case: "error",
-              value: create(McpErrorSchema, { error: step.result.content }),
+              value: create(McpToolErrorSchema, { error: step.result.content }),
             }
           : {
               case: "success",
@@ -1831,7 +1837,7 @@ export function deterministicConversationId(convKey: string): string {
     hex.slice(0, 8),
     hex.slice(8, 12),
     `4${hex.slice(13, 16)}`,
-    `${(0x8 | (parseInt(hex[16], 16) & 0x3)).toString(16)}${hex.slice(17, 20)}`,
+    `${(0x8 | (parseInt(hex[16]!, 16) & 0x3)).toString(16)}${hex.slice(17, 20)}`,
     hex.slice(20, 32),
   ].join("-");
 }
@@ -2446,7 +2452,7 @@ function handleToolResultResume(
 
   for (const result of toolResults) {
     const turnToolStep = currentTurn.steps.find(
-      (step) =>
+      (step): step is ParsedToolCallStep =>
         step.kind === "toolCall" && step.toolCallId === result.toolCallId,
     );
     if (turnToolStep) {

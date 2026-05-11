@@ -1,4 +1,4 @@
-import rawModels from "./cursor-models-raw.json";
+import rawModels from "./cursor-models-raw.json" with { type: "json" };
 import { afterEach, describe, expect, test } from "vitest";
 import { EventEmitter } from "node:events";
 import { request as httpRequest } from "node:http";
@@ -350,10 +350,10 @@ describe("processModels", () => {
       m("gpt-5.4-xhigh"),
     ]);
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("gpt-5.4");
-    expect(result[0].supportsEffort).toBe(true);
-    expect(result[0].effortMap!.medium).toBe("medium");
-    expect(result[0].effortMap!.xhigh).toBe("xhigh");
+    expect(result[0]!.id).toBe("gpt-5.4");
+    expect(result[0]!.supportsEffort).toBe(true);
+    expect(result[0]!.effortMap!.medium).toBe("medium");
+    expect(result[0]!.effortMap!.xhigh).toBe("xhigh");
   });
 
   test("gpt-5.4-fast — deduped from effort+fast variants", () => {
@@ -363,8 +363,8 @@ describe("processModels", () => {
       m("gpt-5.4-xhigh-fast"),
     ]);
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("gpt-5.4-fast");
-    expect(result[0].supportsEffort).toBe(true);
+    expect(result[0]!.id).toBe("gpt-5.4-fast");
+    expect(result[0]!.supportsEffort).toBe(true);
   });
 
   test("gpt-5.2 — deduped from default + effort variants", () => {
@@ -375,10 +375,10 @@ describe("processModels", () => {
       m("gpt-5.2-xhigh"),
     ]);
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("gpt-5.2");
-    expect(result[0].supportsEffort).toBe(true);
-    expect(result[0].effortMap!.medium).toBe(""); // no-suffix = default
-    expect(result[0].effortMap!.high).toBe("high");
+    expect(result[0]!.id).toBe("gpt-5.2");
+    expect(result[0]!.supportsEffort).toBe(true);
+    expect(result[0]!.effortMap!.medium).toBe(""); // no-suffix = default
+    expect(result[0]!.effortMap!.high).toBe("high");
   });
 
   test("gpt-5.4-mini — has none effort", () => {
@@ -390,9 +390,9 @@ describe("processModels", () => {
       m("gpt-5.4-mini-none"),
     ]);
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("gpt-5.4-mini");
-    expect(result[0].supportsEffort).toBe(true);
-    expect(result[0].effortMap!.minimal).toBe("none");
+    expect(result[0]!.id).toBe("gpt-5.4-mini");
+    expect(result[0]!.supportsEffort).toBe(true);
+    expect(result[0]!.effortMap!.minimal).toBe("none");
   });
 
   test("claude-4.6-opus — high+max deduped, effort clamped to lowest", () => {
@@ -401,13 +401,13 @@ describe("processModels", () => {
       m("claude-4.6-opus-max"),
     ]);
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("claude-4.6-opus");
-    expect(result[0].supportsEffort).toBe(true);
-    expect(result[0].effortMap!.minimal).toBe("high");
-    expect(result[0].effortMap!.low).toBe("high");
-    expect(result[0].effortMap!.medium).toBe("high");
-    expect(result[0].effortMap!.high).toBe("high");
-    expect(result[0].effortMap!.xhigh).toBe("max");
+    expect(result[0]!.id).toBe("claude-4.6-opus");
+    expect(result[0]!.supportsEffort).toBe(true);
+    expect(result[0]!.effortMap!.minimal).toBe("high");
+    expect(result[0]!.effortMap!.low).toBe("high");
+    expect(result[0]!.effortMap!.medium).toBe("high");
+    expect(result[0]!.effortMap!.high).toBe("high");
+    expect(result[0]!.effortMap!.xhigh).toBe("max");
   });
 
   test("claude-4.6-opus-thinking — high+max thinking deduped", () => {
@@ -416,34 +416,34 @@ describe("processModels", () => {
       m("claude-4.6-opus-max-thinking"),
     ]);
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("claude-4.6-opus-thinking");
-    expect(result[0].supportsEffort).toBe(true);
-    expect(result[0].effortMap!.high).toBe("high");
-    expect(result[0].effortMap!.xhigh).toBe("max");
+    expect(result[0]!.id).toBe("claude-4.6-opus-thinking");
+    expect(result[0]!.supportsEffort).toBe(true);
+    expect(result[0]!.effortMap!.high).toBe("high");
+    expect(result[0]!.effortMap!.xhigh).toBe("max");
   });
 
   test("claude-4.5-opus-high — single effort variant, deduped to base", () => {
     const result = processModels([m("claude-4.5-opus-high")]);
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("claude-4.5-opus");
-    expect(result[0].supportsEffort).toBe(true);
-    expect(result[0].effortMap!.high).toBe("high");
-    expect(result[0].effortMap!.minimal).toBe("high");
+    expect(result[0]!.id).toBe("claude-4.5-opus");
+    expect(result[0]!.supportsEffort).toBe(true);
+    expect(result[0]!.effortMap!.high).toBe("high");
+    expect(result[0]!.effortMap!.minimal).toBe("high");
   });
 
   test("claude-4.6-sonnet-medium — single effort variant, deduped to base", () => {
     const result = processModels([m("claude-4.6-sonnet-medium")]);
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("claude-4.6-sonnet");
-    expect(result[0].supportsEffort).toBe(true);
-    expect(result[0].effortMap!.medium).toBe("medium");
+    expect(result[0]!.id).toBe("claude-4.6-sonnet");
+    expect(result[0]!.supportsEffort).toBe(true);
+    expect(result[0]!.effortMap!.medium).toBe("medium");
   });
 
   test("composer-2 — single model without effort, NOT deduped", () => {
     const result = processModels([m("composer-2")]);
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("composer-2");
-    expect(result[0].supportsEffort).toBe(false);
+    expect(result[0]!.id).toBe("composer-2");
+    expect(result[0]!.supportsEffort).toBe(false);
   });
 
   test("gpt-5.1-codex-max — deduped, max stays in base name", () => {
@@ -454,8 +454,8 @@ describe("processModels", () => {
       m("gpt-5.1-codex-max-xhigh"),
     ]);
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("gpt-5.1-codex-max");
-    expect(result[0].supportsEffort).toBe(true);
+    expect(result[0]!.id).toBe("gpt-5.1-codex-max");
+    expect(result[0]!.supportsEffort).toBe(true);
   });
 
   test("gpt-5.3-codex-spark-preview — deduped", () => {
@@ -466,8 +466,8 @@ describe("processModels", () => {
       m("gpt-5.3-codex-spark-preview-xhigh"),
     ]);
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("gpt-5.3-codex-spark-preview");
-    expect(result[0].supportsEffort).toBe(true);
+    expect(result[0]!.id).toBe("gpt-5.3-codex-spark-preview");
+    expect(result[0]!.supportsEffort).toBe(true);
   });
 
   test("standalone models pass through", () => {
@@ -488,7 +488,7 @@ describe("processModels", () => {
       m("gpt-5.4-medium", "GPT-5.4 1M"),
       m("gpt-5.4-high", "GPT-5.4 1M High"),
     ]);
-    expect(result[0].name).toBe("GPT-5.4 1M");
+    expect(result[0]!.name).toBe("GPT-5.4 1M");
   });
 
   test("uses representative name from default (no-suffix) variant", () => {
@@ -497,7 +497,7 @@ describe("processModels", () => {
       m("gpt-5.2-high", "GPT-5.2 High"),
       m("gpt-5.2-low", "GPT-5.2 Low"),
     ]);
-    expect(result[0].name).toBe("GPT-5.2");
+    expect(result[0]!.name).toBe("GPT-5.2");
   });
 
   test("full raw model list dedup count", () => {
@@ -692,6 +692,7 @@ describe("session cleanup", () => {
           ended++;
         },
         onData() {},
+        unref() {},
         onClose() {},
         proc: {} as any,
       } as any,
@@ -760,6 +761,7 @@ describe("session cleanup hook wiring", () => {
         write() {},
         end() {},
         onData() {},
+        unref() {},
         onClose() {},
         proc: {} as any,
       } as any,
@@ -791,7 +793,8 @@ describe("session cleanup hook wiring", () => {
           write() {},
           end() {},
           onData() {},
-          onClose() {},
+          unref() {},
+        onClose() {},
           proc: {} as any,
         } as any,
         heartbeatTimer,
@@ -838,10 +841,7 @@ describe("derivePiSessionId", () => {
 function decodeRunRequest(payload: ReturnType<typeof buildCursorRequest>) {
   const clientMsg = fromBinary(AgentClientMessageSchema, payload.requestBytes);
   expect(clientMsg.message.case).toBe("runRequest");
-  return clientMsg.message.value as InstanceType<
-    (typeof AgentRunRequestSchema)["$typeName"]
-  > &
-    any;
+  return clientMsg.message.value as any;
 }
 
 function resolveBlob(
@@ -906,16 +906,16 @@ describe("buildCursorRequest — turn reconstruction", () => {
     const decoded = decodeTurns(req.conversationState, payload.blobStore);
     expect(decoded).toHaveLength(2);
 
-    expect(decoded[0].userMsg.text).toBe("first question");
-    expect(decoded[0].steps).toHaveLength(1);
-    expect(decoded[0].steps[0].message.case).toBe("assistantMessage");
-    expect((decoded[0].steps[0].message.value as any).text).toBe(
+    expect(decoded[0]!.userMsg.text).toBe("first question");
+    expect(decoded[0]!.steps).toHaveLength(1);
+    expect(decoded[0]!.steps[0]!.message.case).toBe("assistantMessage");
+    expect((decoded[0]!.steps[0]!.message.value as any).text).toBe(
       "first answer",
     );
 
-    expect(decoded[1].userMsg.text).toBe("second question");
-    expect(decoded[1].steps[0].message.case).toBe("assistantMessage");
-    expect((decoded[1].steps[0].message.value as any).text).toBe(
+    expect(decoded[1]!.userMsg.text).toBe("second question");
+    expect(decoded[1]!.steps[0]!.message.case).toBe("assistantMessage");
+    expect((decoded[1]!.steps[0]!.message.value as any).text).toBe(
       "second answer",
     );
 
@@ -948,27 +948,20 @@ describe("buildCursorRequest — turn reconstruction", () => {
     const decoded = decodeTurns(req.conversationState, payload.blobStore);
 
     expect(decoded).toHaveLength(1);
-    expect(decoded[0].userMsg.text).toBe("inspect file");
-    expect(decoded[0].steps).toHaveLength(2);
+    expect(decoded[0]!.userMsg.text).toBe("inspect file");
+    expect(decoded[0]!.steps).toHaveLength(2);
 
-    const toolCallStep = decoded[0].steps[0]!;
+    const toolCallStep = decoded[0]!.steps[0]!;
+    const toolCallValue = toolCallStep.message.value as any;
     expect(toolCallStep.message.case).toBe("toolCall");
-    expect(toolCallStep.message.value.tool.case).toBe("mcpToolCall");
-    expect(toolCallStep.message.value.tool.value.args?.toolCallId).toBe("tc1");
-    expect(toolCallStep.message.value.tool.value.args?.toolName).toBe("read");
-    expect(toolCallStep.message.value.tool.value.result?.result.case).toBe(
-      "success",
-    );
-    expect(
-      toolCallStep.message.value.tool.value.result?.result.value.content[0]
-        ?.content.case,
-    ).toBe("text");
-    expect(
-      toolCallStep.message.value.tool.value.result?.result.value.content[0]
-        ?.content.value.text,
-    ).toBe("file contents");
+    expect(toolCallValue.tool.case).toBe("mcpToolCall");
+    expect(toolCallValue.tool.value.args?.toolCallId).toBe("tc1");
+    expect(toolCallValue.tool.value.args?.toolName).toBe("read");
+    expect(toolCallValue.tool.value.result?.result.case).toBe("success");
+    expect(toolCallValue.tool.value.result?.result.value.content[0]?.content.case).toBe("text");
+    expect(toolCallValue.tool.value.result?.result.value.content[0]?.content.value.text).toBe("file contents");
 
-    const finalAssistantStep = decoded[0].steps[1]!;
+    const finalAssistantStep = decoded[0]!.steps[1]!;
     expect(finalAssistantStep.message.case).toBe("assistantMessage");
     expect((finalAssistantStep.message.value as any).text).toBe(
       "I found the issue.",
@@ -991,8 +984,8 @@ describe("buildCursorRequest — turn reconstruction", () => {
     const req = decodeRunRequest(payload);
     const decoded = decodeTurns(req.conversationState, payload.blobStore);
     expect(decoded).toHaveLength(1);
-    expect(decoded[0].userMsg.text).toBe("hello");
-    expect(decoded[0].steps).toHaveLength(0);
+    expect(decoded[0]!.userMsg.text).toBe("hello");
+    expect(decoded[0]!.steps).toHaveLength(0);
   });
 
   test("with checkpoint — uses checkpoint, ignores turns", () => {
@@ -1063,7 +1056,7 @@ describe("buildCursorRequest — turn reconstruction", () => {
     );
     const req = decodeRunRequest(payload);
     const decoded = decodeTurns(req.conversationState, payload.blobStore);
-    expect(decoded[0].userMsg.messageId).not.toBe(decoded[1].userMsg.messageId);
+    expect(decoded[0]!.userMsg.messageId).not.toBe(decoded[1]!.userMsg.messageId);
   });
 });
 
@@ -1084,8 +1077,8 @@ describe("fork discards checkpoint, reconstruction takes over", () => {
 
     const decoded = decodeTurns(req.conversationState, payload.blobStore);
     expect(decoded).toHaveLength(1);
-    expect(decoded[0].userMsg.text).toBe("first");
-    expect((decoded[0].steps[0].message.value as any).text).toBe("response1");
+    expect(decoded[0]!.userMsg.text).toBe("first");
+    expect((decoded[0]!.steps[0]!.message.value as any).text).toBe("response1");
 
     const userAction = req.action.action.value as any;
     expect(userAction.userMessage.text).toBe("forked question");
@@ -1311,19 +1304,16 @@ class FakeBridge {
   private pendingCloseCode: number | null = null;
   private pendingServerChunks: Buffer[] = [];
   readonly clientMessages: any[] = [];
+  readonly options: { accessToken: string; rpcPath: string; url?: string; unary?: boolean };
+  private readonly onClientMessage?: (message: any, bridge: FakeBridge) => void;
 
   constructor(
-    readonly options: {
-      accessToken: string;
-      rpcPath: string;
-      url?: string;
-      unary?: boolean;
-    },
-    private readonly onClientMessage?: (
-      message: any,
-      bridge: FakeBridge,
-    ) => void,
-  ) {}
+    options: { accessToken: string; rpcPath: string; url?: string; unary?: boolean },
+    onClientMessage?: (message: any, bridge: FakeBridge) => void,
+  ) {
+    this.options = options;
+    this.onClientMessage = onClientMessage;
+  }
 
   get alive() {
     return this.aliveState;
@@ -1340,6 +1330,8 @@ class FakeBridge {
   end() {
     this.close(0);
   }
+
+  unref() {}
 
   onData(cb: (chunk: Buffer) => void) {
     this.dataCb = cb;

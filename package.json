@@ -53,6 +53,7 @@
     "debug:timeline": "node scripts/debug-log-timeline.mjs"
   },
   "devDependencies": {
+    "typescript": "^6.0.3",
     "vitest": "^4.1.3"
   }
 }

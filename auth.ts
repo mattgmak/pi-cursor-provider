@@ -111,6 +111,7 @@ export interface CursorCredentials {
   access: string;
   refresh: string;
   expires: number;
+  [key: string]: unknown;
 }
 
 export async function refreshCursorToken(
