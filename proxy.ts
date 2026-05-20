@@ -523,10 +523,21 @@ export interface CursorModel {
   maxTokens: number;
 }
 
-let cachedModels: CursorModel[] | null = null;
+let cachedModelsForToken: { token: string; models: CursorModel[] } | null =
+  null;
 
-export async function getCursorModels(apiKey: string): Promise<CursorModel[]> {
-  if (cachedModels) return cachedModels;
+export type GetCursorModelsOptions = {
+  /** When true, bypass the in-process token→models cache (fresh RPC). */
+  bypassCache?: boolean;
+};
+
+export async function getCursorModels(
+  apiKey: string,
+  options?: GetCursorModelsOptions,
+): Promise<CursorModel[]> {
+  if (!options?.bypassCache && cachedModelsForToken?.token === apiKey) {
+    return cachedModelsForToken.models;
+  }
   try {
     const requestPayload = create(GetUsableModelsRequestSchema, {});
     const requestBody = toBinary(GetUsableModelsRequestSchema, requestPayload);
@@ -555,7 +566,7 @@ export async function getCursorModels(apiKey: string): Promise<CursorModel[]> {
       if (decoded?.models?.length) {
         const models = normalizeCursorModels(decoded.models);
         if (models.length > 0) {
-          cachedModels = models;
+          cachedModelsForToken = { token: apiKey, models };
           return models;
         }
       }

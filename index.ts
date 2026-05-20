@@ -13,12 +13,17 @@
  */
 
 import rawFallbackModels from "./cursor-models-raw.json" with { type: "json" };
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import {
+  AuthStorage,
+  getAgentDir,
+  type ExtensionAPI,
+} from "@mariozechner/pi-coding-agent";
 import type {
   OAuthCredentials,
   OAuthLoginCallbacks,
 } from "@mariozechner/pi-ai";
-import { appendFileSync } from "node:fs";
+import type { Model } from "@mariozechner/pi-ai";
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join as pathJoin } from "node:path";
 import {
@@ -468,6 +473,80 @@ export function processModels(raw: CursorModel[]): ProcessedModel[] {
   return result.sort((a, b) => a.id.localeCompare(b.id));
 }
 
+type SessionBranchEntry = {
+  type: string;
+  provider?: string;
+  modelId?: string;
+};
+
+type PiSettings = {
+  defaultProvider?: string;
+  defaultModel?: string;
+};
+
+/** Latest cursor model from session branch, else settings default. */
+export function readPersistedCursorModelId(
+  settings: PiSettings | undefined,
+  branch: readonly SessionBranchEntry[],
+): string | undefined {
+  for (let i = branch.length - 1; i >= 0; i--) {
+    const entry = branch[i];
+    if (
+      entry?.type === "model_change" &&
+      entry.provider === "cursor" &&
+      entry.modelId
+    ) {
+      return entry.modelId;
+    }
+  }
+  if (settings?.defaultProvider === "cursor" && settings.defaultModel) {
+    return settings.defaultModel;
+  }
+  return undefined;
+}
+
+function readPiSettings(): PiSettings | undefined {
+  const settingsPath = pathJoin(getAgentDir(), "settings.json");
+  if (!existsSync(settingsPath)) return undefined;
+  try {
+    return JSON.parse(readFileSync(settingsPath, "utf-8")) as PiSettings;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Resolve a Cursor access token during extension load (oauth provider not
+ * registered yet) and after bind (via AuthStorage.getApiKey).
+ */
+export async function resolveCursorAccessToken(
+  auth: AuthStorage,
+  setToken: (token: string) => void,
+  getToken: () => string,
+): Promise<string | undefined> {
+  if (getToken()) return getToken();
+
+  await auth.getApiKey("cursor");
+  if (getToken()) return getToken();
+
+  const cred = auth.get("cursor");
+  if (cred?.type !== "oauth") return undefined;
+
+  if (Date.now() < cred.expires && cred.access) {
+    setToken(cred.access);
+    return cred.access;
+  }
+
+  try {
+    const refreshed = await refreshCursorToken(cred.refresh);
+    setToken(refreshed.access);
+    auth.set("cursor", { type: "oauth", ...refreshed });
+    return refreshed.access;
+  } catch {
+    return undefined;
+  }
+}
+
 function modelConfig(m: ProcessedModel) {
   return {
     id: m.id,
@@ -663,10 +742,9 @@ export default async function (pi: ExtensionAPI): Promise<void> {
 
   // Await proxy so models are registered before pi proceeds with model resolution.
   const port = await proxyReady;
-  register(pi, port, FALLBACK_MODELS);
 
-  function register(pi: ExtensionAPI, port: number, rawModels: CursorModel[]) {
-    const baseUrl = `http://127.0.0.1:${port}/v1`;
+  function register(pi: ExtensionAPI, regPort: number, rawModels: CursorModel[]) {
+    const baseUrl = `http://127.0.0.1:${regPort}/v1`;
     const processed = skipDedup
       ? rawModels.map(
           (m) => ({ ...m, supportsEffort: false }) as ProcessedModel,
@@ -717,9 +795,97 @@ export default async function (pi: ExtensionAPI): Promise<void> {
 
         getApiKey(credentials: OAuthCredentials): string {
           currentToken = credentials.access;
+          // Persisted Cursor OAuth: discovery is awaited on startup and on session
+          // events via `refreshDiscoveredModels()`, so picker lists match the RPC.
           return "cursor-proxy";
         },
       },
     });
   }
+
+  async function tryRestorePersistedModel(ctx: {
+    model?: Model<any>;
+    modelRegistry: { find(provider: string, modelId: string): Model<any> | undefined };
+    sessionManager: { getBranch(): readonly SessionBranchEntry[] };
+  }): Promise<void> {
+    const desiredId = readPersistedCursorModelId(
+      readPiSettings(),
+      ctx.sessionManager.getBranch(),
+    );
+    if (!desiredId) return;
+
+    const current = ctx.model;
+    if (current?.provider === "cursor" && current.id === desiredId) return;
+
+    const found = ctx.modelRegistry.find("cursor", desiredId);
+    if (!found) return;
+
+    const restored = await pi.setModel(found);
+    debugExtensionLog("models.restore_persisted", {
+      desiredId,
+      previousId: current?.id,
+      restored,
+    });
+  }
+
+  async function refreshDiscoveredModels(
+    reason: string,
+    ctx?: {
+      model?: Model<any>;
+      modelRegistry: { find(provider: string, modelId: string): Model<any> | undefined };
+      sessionManager: { getBranch(): readonly SessionBranchEntry[] };
+    },
+  ): Promise<void> {
+    try {
+      const auth = AuthStorage.create();
+      if (auth.get("cursor")?.type !== "oauth") return;
+
+      const token = await resolveCursorAccessToken(
+        auth,
+        (token) => {
+          currentToken = token;
+        },
+        () => currentToken,
+      );
+      if (!token) return;
+
+      const discovered = await getCursorModels(token, {
+        bypassCache: true,
+      });
+      if (discovered.length === 0) return;
+
+      const realPort = await proxyReady;
+      register(pi, realPort, discovered);
+
+      debugExtensionLog("models.discovered_refresh", {
+        reason,
+        count: discovered.length,
+      });
+
+      if (ctx) {
+        await tryRestorePersistedModel(ctx);
+      }
+    } catch (err) {
+      console.error(
+        "[cursor-provider] Model discovery refresh failed:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
+  register(pi, port, FALLBACK_MODELS);
+  await refreshDiscoveredModels("extension_load");
+
+  // Local pi-coding-agent type bundles can lag newer runtime events.
+  const lifecycleHooks = pi as ExtensionAPI & {
+    on(event: string, handler: () => void): void;
+  };
+
+  lifecycleHooks.on("session_start", (_event, ctx) => {
+    void refreshDiscoveredModels("session_start", ctx);
+  });
+
+  lifecycleHooks.on("session_fork", (_event, ctx) => {
+    void refreshDiscoveredModels("session_fork", ctx);
+  });
 }

@@ -7,6 +7,7 @@ import {
   FALLBACK_MODELS,
   parseModelId,
   processModels,
+  readPersistedCursorModelId,
   registerSessionLifecycleCleanup,
   supportsReasoningModelId,
 } from "./index.ts";
@@ -65,6 +66,40 @@ function m(id: string, name?: string): CursorModel {
     maxTokens: 64_000,
   };
 }
+
+// ── readPersistedCursorModelId ──
+
+describe("readPersistedCursorModelId", () => {
+  test("prefers latest session model_change over settings default", () => {
+    expect(
+      readPersistedCursorModelId(
+        { defaultProvider: "cursor", defaultModel: "composer-2.5-fast" },
+        [
+          { type: "model_change", provider: "cursor", modelId: "composer-2-fast" },
+          { type: "message" },
+        ],
+      ),
+    ).toBe("composer-2-fast");
+  });
+
+  test("falls back to settings default when session has no cursor model_change", () => {
+    expect(
+      readPersistedCursorModelId(
+        { defaultProvider: "cursor", defaultModel: "composer-2.5-fast" },
+        [{ type: "session" }],
+      ),
+    ).toBe("composer-2.5-fast");
+  });
+
+  test("returns undefined when settings point at another provider", () => {
+    expect(
+      readPersistedCursorModelId(
+        { defaultProvider: "openai", defaultModel: "gpt-5" },
+        [],
+      ),
+    ).toBeUndefined();
+  });
+});
 
 // ── parseModelId ──
 
