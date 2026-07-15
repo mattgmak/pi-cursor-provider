@@ -36,6 +36,7 @@ import {
   cleanupSessionState,
   getCursorModels,
   inferContextWindow,
+  loadCachedModels,
   startProxy,
   type CursorModel,
 } from "./proxy.js";
@@ -617,14 +618,16 @@ export function registerSessionLifecycleCleanup(pi: ExtensionAPI): void {
   pi.on("session_before_tree", cleanupCurrentSession);
   pi.on("session_shutdown", cleanupCurrentSession);
 
-  // After pi compacts its message list the cursor proxy's cached checkpoint
-  // still reflects the full pre-compaction conversation.  Clearing the state
-  // here forces the proxy to rebuild the cursor conversation from pi's now-
-  // compacted messages on the next request, so both sides stay in sync.
+  // After pi compacts its message list, keep the checkpoint intact.
+  // The checkpoint is the only thing that gives Cursor memory of prior turns;
+  // clearing it forces a rebuild from turns, which Cursor's server silently
+  // ignores (it doesn't fetch turn blobs from a synthetic state).  The
+  // checkpoint already reflects the full server-side conversation and remains
+  // valid regardless of what pi compacted locally.
   pi.on("session_compact", (_event, ctx) => {
-    const sessionId = ctx.sessionManager.getSessionId();
-    debugExtensionLog("session.post_compact_cleanup", { sessionId });
-    cleanupSessionState(sessionId);
+    debugExtensionLog("session.post_compact_noop", {
+      sessionId: ctx.sessionManager.getSessionId(),
+    });
   });
 }
 
@@ -762,6 +765,9 @@ export default async function (pi: ExtensionAPI): Promise<void> {
   });
 
   // Await proxy so models are registered before pi proceeds with model resolution.
+  // Prefer the on-disk cache from the last successful discovery so a fresh
+  // process registers current models (e.g. Opus 4.8) synchronously — before Pi
+  // resolves enabledModels — instead of the stale bundled snapshot.
   const port = await proxyReady;
 
   function register(pi: ExtensionAPI, regPort: number, rawModels: CursorModel[]) {
@@ -894,7 +900,7 @@ export default async function (pi: ExtensionAPI): Promise<void> {
     }
   }
 
-  register(pi, port, FALLBACK_MODELS);
+  register(pi, port, loadCachedModels() ?? FALLBACK_MODELS);
   await refreshDiscoveredModels("extension_load");
 
   // Local pi-coding-agent type bundles can lag newer runtime events.
