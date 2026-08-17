@@ -12,6 +12,7 @@ import {
   supportsReasoningModelId,
 } from "./index.ts";
 import {
+  inferContextWindow,
   resolveModelId,
   __testInternals,
   cleanupAllSessionState,
@@ -351,8 +352,11 @@ describe("reasoning support", () => {
     expect(supportsReasoningModelId("gpt-5.4")).toBe(true);
     expect(supportsReasoningModelId("gpt-5.4-fast")).toBe(true);
     expect(supportsReasoningModelId("composer-2")).toBe(true);
+    expect(supportsReasoningModelId("cursor-grok-4.6")).toBe(true);
+    expect(supportsReasoningModelId("cursor-grok-4.6-fast")).toBe(true);
     expect(supportsReasoningModelId("default")).toBe(true);
     expect(supportsReasoningModelId("totally-unknown-model")).toBe(false);
+    expect(inferContextWindow("cursor-grok-4.6")).toBe(256_000);
   });
 
   test("fallback models keep derived reasoning enabled", () => {
@@ -400,6 +404,22 @@ describe("processModels", () => {
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe("gpt-5.4-fast");
     expect(result[0]!.supportsEffort).toBe(true);
+  });
+
+  test("cursor-grok-4.6 — deduped from effort variants", () => {
+    const result = processModels([
+      m("cursor-grok-4.6-high"),
+      m("cursor-grok-4.6-medium"),
+      m("cursor-grok-4.6-low"),
+      m("cursor-grok-4.6-xhigh"),
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.id).toBe("cursor-grok-4.6");
+    expect(result[0]!.supportsEffort).toBe(true);
+    expect(supportsReasoningModelId(result[0]!.id)).toBe(true);
+    expect(resolveModelId("cursor-grok-4.6", "medium")).toBe(
+      "cursor-grok-4.6-medium",
+    );
   });
 
   test("gpt-5.2 — deduped from default + effort variants", () => {

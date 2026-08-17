@@ -390,7 +390,7 @@ export function supportsReasoningModelId(id: string): boolean {
   const { base, effort, thinking } = parseModelId(id);
   if (effort || thinking) return true;
   if (base === "default") return true;
-  return /^(claude|composer|gemini|gpt|grok|kimi)(-|$)/i.test(base);
+  return /^(claude|composer|gemini|gpt|(?:cursor-)?grok|kimi)(-|$)/i.test(base);
 }
 
 /**

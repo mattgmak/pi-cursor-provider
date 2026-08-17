@@ -790,8 +790,9 @@ export function inferContextWindow(id: string): number {
   if (lower.startsWith("gpt-")) return 400_000;
 
   // ── Grok ──────────────────────────────────────────────────────────────────
-  // Grok 4 series: 256k.
-  if (lower.startsWith("grok-")) return 256_000;
+  // Grok 4 series: 256k (includes Cursor-branded cursor-grok-* IDs).
+  if (lower.startsWith("cursor-grok-") || lower.startsWith("grok-"))
+    return 256_000;
 
   // ── Kimi ──────────────────────────────────────────────────────────────────
   // Kimi K2.x: 262,144 tokens (256k).
