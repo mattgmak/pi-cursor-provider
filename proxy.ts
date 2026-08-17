@@ -2332,6 +2332,12 @@ function createConnectFrameParser(
 const CONTEXT_OVERFLOW_MSG =
   "context length exceeded — Cursor rejected the request as too large";
 
+// `resource_exhausted` in Cursor's Connect protocol is a generic quota /
+// rate-limit signal, NOT necessarily a context-window overflow. Label it
+// honestly so users don't compact/truncate for the wrong reason.
+const RATE_LIMIT_MSG =
+  "Cursor rate limit or quota exceeded — wait a moment and try again";
+
 function isContextOverflowMessage(msg: string): boolean {
   return /context|token|length|overflow|too.?long|too.?large/i.test(msg);
 }
@@ -2341,7 +2347,7 @@ function mapConnectErrorCode(code: string, message: string): string {
     case "unauthenticated":
       return "Cursor authentication expired — run /login cursor";
     case "resource_exhausted":
-      return CONTEXT_OVERFLOW_MSG;
+      return RATE_LIMIT_MSG;
     case "deadline_exceeded":
       return "Cursor request timed out server-side — try again";
     case "unavailable":
@@ -2356,11 +2362,24 @@ function mapConnectErrorCode(code: string, message: string): string {
 }
 
 interface ConnectEndStreamError {
+  code: string;
   message: string;
   retryable: boolean;
 }
 
-const RETRYABLE_CONNECT_CODES = new Set(["internal", "unavailable", "deadline_exceeded"]);
+const RETRYABLE_CONNECT_CODES = new Set([
+  "internal",
+  "unavailable",
+  "deadline_exceeded",
+  // Quota/rate-limit rejections are transient — back off and retry rather
+  // than surfacing a misleading error to the user.
+  "resource_exhausted",
+]);
+
+// Backoff before retrying a resource_exhausted rejection, so the burst /
+// quota window has a chance to clear. Override via env.
+const RESOURCE_EXHAUSTED_RETRY_DELAY_MS =
+  parseInt(process.env.PI_CURSOR_RATE_LIMIT_RETRY_DELAY_MS ?? "") || 8_000;
 
 function parseConnectEndStream(data: Uint8Array): ConnectEndStreamError | null {
   if (data.length === 0) return null;
@@ -2371,6 +2390,7 @@ function parseConnectEndStream(data: Uint8Array): ConnectEndStreamError | null {
       const code = String(error.code ?? "unknown");
       const rawMessage = String(error.message ?? "Unknown error");
       return {
+        code,
         message: mapConnectErrorCode(code, rawMessage),
         retryable: RETRYABLE_CONNECT_CODES.has(code),
       };
@@ -2646,6 +2666,7 @@ function writeSSEStream(
   let activeHeartbeatTimer = initialHeartbeatTimer;
   let retryCount = 0;
   let retryableConnectError = false;
+  let lastConnectErrorCode: string | null = null;
 
   // Snapshot the checkpoint before this turn so retries replay cleanly
   // without risking a mid-turn checkpoint that includes partial progress.
@@ -2904,6 +2925,7 @@ function writeSSEStream(
               `[cursor-provider] Retryable Cursor error (${modelId}): ${endError.message} — will retry (${retryCount + 1}/${MAX_BRIDGE_RETRIES})`,
             );
             retryableConnectError = true;
+            lastConnectErrorCode = endError.code;
             try { activeBridge.proc.kill(); } catch {}
             return;
           }
@@ -2984,6 +3006,10 @@ function writeSSEStream(
           retryCount++;
           const wasConnectError = retryableConnectError;
           retryableConnectError = false;
+          const backoffMs =
+            wasConnectError && lastConnectErrorCode === "resource_exhausted"
+              ? RESOURCE_EXHAUSTED_RETRY_DELAY_MS
+              : 0;
           debugLog("stream.retry", {
             requestId,
             bridgeKey,
@@ -2991,38 +3017,44 @@ function writeSSEStream(
             attempt: retryCount,
             maxRetries: MAX_BRIDGE_RETRIES,
             connectError: wasConnectError,
+            backoffMs,
           });
           console.error(
             `[cursor-provider] ${wasConnectError ? "Retryable Cursor error" : `Bridge died (exit ${code})`}, retry ${retryCount}/${MAX_BRIDGE_RETRIES} (${modelId})`,
           );
 
-          // Reset per-attempt stream state; keep cumulative token counts.
-          state.pendingExecs = [];
-          latestCheckpoint = null;
+          const launchRetry = () => {
+            // Reset per-attempt stream state; keep cumulative token counts.
+            state.pendingExecs = [];
+            latestCheckpoint = null;
 
-          const retryPayload = buildCursorRequest(
-            modelId,
-            stored.systemPrompt || "You are a helpful assistant.",
-            currentTurn.userText,
-            completedTurns,
-            stored.conversationId,
-            cp,
-            blobStore,
-            currentTurn.images,
-          );
-          retryPayload.mcpTools = mcpTools;
+            const retryPayload = buildCursorRequest(
+              modelId,
+              stored.systemPrompt || "You are a helpful assistant.",
+              currentTurn.userText,
+              completedTurns,
+              stored.conversationId,
+              cp,
+              blobStore,
+              currentTurn.images,
+            );
+            retryPayload.mcpTools = mcpTools;
 
-          const { bridge: newBridge, heartbeatTimer: newTimer } = startBridge(
-            accessToken,
-            retryPayload.requestBytes,
-            bridgeKey,
-          );
-          activeBridge = newBridge;
-          activeHeartbeatTimer = newTimer;
+            const { bridge: newBridge, heartbeatTimer: newTimer } = startBridge(
+              accessToken,
+              retryPayload.requestBytes,
+              bridgeKey,
+            );
+            activeBridge = newBridge;
+            activeHeartbeatTimer = newTimer;
 
-          // Re-register client-close listener with new bridge refs (the old
-          // listener already uses the mutable activeBridge/activeHeartbeatTimer).
-          attachToBridge();
+            // Re-register client-close listener with new bridge refs (the old
+            // listener already uses the mutable activeBridge/activeHeartbeatTimer).
+            attachToBridge();
+          };
+
+          if (backoffMs > 0) setTimeout(launchRetry, backoffMs);
+          else launchRetry();
           return;
         }
       }
