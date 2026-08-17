@@ -14,7 +14,6 @@
 
 import rawFallbackModels from "./cursor-models-raw.json" with { type: "json" };
 import {
-  AuthStorage,
   getAgentDir,
   type ExtensionAPI,
 } from "@mariozechner/pi-coding-agent";
@@ -541,28 +540,36 @@ function readPiSettings(): PiSettings | undefined {
  * Resolve a Cursor access token during extension load (oauth provider not
  * registered yet) and after bind (via AuthStorage.getApiKey).
  */
+/** Read a provider credential directly from auth.json (no AuthStorage dependency). */
+function readAuthCredential(
+  providerId: string,
+): { type: string; access?: string; refresh?: string; expires?: number } | undefined {
+  try {
+    const authPath = pathJoin(getAgentDir(), "auth.json");
+    const data = JSON.parse(readFileSync(authPath, "utf-8"));
+    return data[providerId];
+  } catch {
+    return undefined;
+  }
+}
+
 export async function resolveCursorAccessToken(
-  auth: AuthStorage,
   setToken: (token: string) => void,
   getToken: () => string,
 ): Promise<string | undefined> {
   if (getToken()) return getToken();
 
-  await auth.getApiKey("cursor");
-  if (getToken()) return getToken();
-
-  const cred = auth.get("cursor");
+  const cred = readAuthCredential("cursor");
   if (cred?.type !== "oauth") return undefined;
 
-  if (Date.now() < cred.expires && cred.access) {
+  if (cred.access && Date.now() < (cred.expires ?? 0)) {
     setToken(cred.access);
     return cred.access;
   }
 
   try {
-    const refreshed = await refreshCursorToken(cred.refresh);
+    const refreshed = await refreshCursorToken(cred.refresh!);
     setToken(refreshed.access);
-    auth.set("cursor", { type: "oauth", ...refreshed });
     return refreshed.access;
   } catch {
     return undefined;
@@ -864,16 +871,15 @@ export default async function (pi: ExtensionAPI): Promise<void> {
     },
   ): Promise<void> {
     try {
-      const auth = AuthStorage.create();
-      if (auth.get("cursor")?.type !== "oauth") return;
+      const cred = readAuthCredential("cursor");
+      if (cred?.type !== "oauth") return;
 
-      const token = await resolveCursorAccessToken(
-        auth,
-        (token) => {
-          currentToken = token;
-        },
-        () => currentToken,
-      );
+      // Use stored token directly
+      if (cred.access && Date.now() < (cred.expires ?? 0)) {
+        currentToken = cred.access;
+      }
+
+      const token = currentToken;
       if (!token) return;
 
       const discovered = await getCursorModels(token, {
